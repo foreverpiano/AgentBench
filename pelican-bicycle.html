@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>鹈鹕骑自行车 - Pelican Riding a Bicycle</title>
+  <style>
+    :root {
+      --sky-top: #38bdf8;
+      --sky-mid: #7dd3fc;
+      --sky-bottom: #e0f2fe;
+      --sun-color: #fde047;
+      --sun-glow: rgba(254, 240, 138, 0.55);
+      --hill-back: #6ee7b7;
+      --hill-front: #34d399;
+      --road-bg: #334155;
+      --road-line: #f8fafc;
+      --grass-border: #10b981;
+      --panel-bg: rgba(255, 255, 255, 0.88);
+      --text-main: #0f172a;
+      --speed-mult: 1;
+      --pelican-bob: 0.48s;
+      --wheel-spin: 0.96s;
+      --road-scroll: 0.7s;
+    }
+
+    body.sunset {
+      --sky-top: #4c1d95;
+      --sky-mid: #ea580c;
+      --sky-bottom: #fde047;
+      --sun-color: #fb923c;
+      --sun-glow: rgba(251, 146, 60, 0.65);
+      --hill-back: #7c2d12;
+      --hill-front: #431407;
+      --road-bg: #1e293b;
+      --grass-border: #b45309;
+    }
+
+    body.night {
+      --sky-top: #090d16;
+      --sky-mid: #1e1b4b;
+      --sky-bottom: #312e81;
+      --sun-color: #fef08a;
+      --sun-glow: rgba(254, 240, 138, 0.3);
+      --hill-back: #064e3b;
+      --hill-front: #022c22;
+      --road-bg: #0f172a;
+      --grass-border: #047857;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 60%, var(--sky-bottom) 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      transition: background 0.6s ease;
+      user-select: none;
+    }
+
+    .scene-wrapper {
+      position: relative;
+      width: min(960px, 95vw);
+      height: min(620px, 82vh);
+      border-radius: 28px;
+      overflow: hidden;
+      box-shadow: 0 25px 60px rgba(15, 23, 42, 0.35), 0 0 0 4px rgba(255, 255, 255, 0.5);
+      background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 58%, var(--sky-bottom) 85%);
+      transition: background 0.6s ease;
+    }
+
+    /* Title Banner */
+    .header-bar {
+      position: absolute;
+      top: 18px;
+      left: 22px;
+      right: 22px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 20;
+      pointer-events: none;
+    }
+
+    .title-badge {
+      background: var(--panel-bg);
+      backdrop-filter: blur(10px);
+      padding: 10px 18px;
+      border-radius: 999px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      pointer-events: auto;
+    }
+
+    .title-badge h1 {
+      font-size: 1.15rem;
+      color: var(--text-main);
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .speed-tag {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #0284c7;
+      background: #e0f2fe;
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border: none;
+      background: var(--panel-bg);
+      backdrop-filter: blur(10px);
+      color: var(--text-main);
+      font-weight: 600;
+      font-size: 0.88rem;
+      padding: 9px 15px;
+      border-radius: 999px;
+      cursor: pointer;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+      transition: transform 0.15s ease, background 0.2s ease, box-shadow 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      background: #ffffff;
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.16);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn.active {
+      background: #0284c7;
+      color: #ffffff;
+    }
+
+    /* SVG Stage */
+    svg.stage {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Clouds animation */
+    .cloud-slow {
+      animation: drift 26s linear infinite;
+    }
+    .cloud-med {
+      animation: drift 18s linear infinite;
+    }
+    .cloud-fast {
+      animation: drift 12s linear infinite;
+    }
+
+    @keyframes drift {
+      from { transform: translateX(1050px); }
+      to { transform: translateX(-350px); }
+    }
+
+    /* Trees & Scenery */
+    .scenery-scroll {
+      animation: roadMove calc(var(--road-scroll) * 5) linear infinite;
+    }
+
+    /* Road dashes */
+    .road-dashes {
+      animation: roadDash var(--road-scroll) linear infinite;
+    }
+
+    @keyframes roadDash {
+      from { stroke-dashoffset: 0; }
+      to { stroke-dashoffset: -120; }
+    }
+
+    @keyframes roadMove {
+      from { transform: translateX(1050px); }
+      to { transform: translateX(-250px); }
+    }
+
+    /* Wheel spin */
+    .wheel-spin {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: spin var(--wheel-spin) linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    /* Pelican bounce */
+    .pelican-rig {
+      animation: bob var(--pelican-bob) ease-in-out infinite alternate;
+    }
+
+    @keyframes bob {
+      0% { transform: translateY(0px) rotate(0deg); }
+      100% { transform: translateY(-6px) rotate(-0.8deg); }
+    }
+
+    /* Scarf flutter */
+    .scarf-wave {
+      animation: scarf 0.35s ease-in-out infinite alternate;
+      transform-origin: 430px 235px;
+    }
+
+    @keyframes scarf {
+      0% { transform: rotate(-4deg) scaleY(0.96); }
+      100% { transform: rotate(7deg) scaleY(1.06); }
+    }
+
+    /* Wing flap */
+    .wing-flap {
+      animation: wing 0.48s ease-in-out infinite alternate;
+      transform-origin: 418px 255px;
+    }
+
+    @keyframes wing {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(-4deg); }
+    }
+
+    /* Fish in pouch bounce */
+    .pouch-fish {
+      animation: fishHop 0.48s ease-in-out infinite alternate;
+      transform-origin: 545px 210px;
+    }
+
+    @keyframes fishHop {
+      0% { transform: translateY(3px) rotate(-6deg); }
+      100% { transform: translateY(-7px) rotate(8deg); }
+    }
+
+    /* Jump animation */
+    .jumping {
+      animation: bikeJump 0.75s cubic-bezier(0.22, 0.61, 0.36, 1);
+    }
+
+    @keyframes bikeJump {
+      0%   { transform: translateY(0) rotate(0deg); }
+      35%  { transform: translateY(-95px) rotate(-12deg); }
+      65%  { transform: translateY(-75px) rotate(6deg); }
+      85%  { transform: translateY(6px) rotate(-2deg); }
+      100% { transform: translateY(0) rotate(0deg); }
+    }
+
+    /* Bell ring bubble */
+    .bell-ring {
+      opacity: 0;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      transform: scale(0.7);
+      transform-origin: 555px 245px;
+    }
+
+    .bell-ring.show {
+      opacity: 1;
+      transform: scale(1.05);
+    }
+
+    /* Stars visible only at night */
+    .night-stars {
+      opacity: 0;
+      transition: opacity 0.6s ease;
+    }
+    body.night .night-stars {
+      opacity: 1;
+    }
+
+    /* Footer bar */
+    .footer-hint {
+      position: absolute;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.65);
+      color: #f8fafc;
+      font-size: 0.82rem;
+      padding: 6px 16px;
+      border-radius: 999px;
+      backdrop-filter: blur(6px);
+      z-index: 20;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="scene-wrapper" id="scene">
+    <div class="header-bar">
+      <div class="title-badge">
+        <h1>鹈鹕骑行记</h1>
+        <span class="speed-tag" id="speedReadout">24 km/h</span>
+      </div>
+      <div class="controls">
+        <button class="btn" id="btnSpeed" title="切换骑行速度">加速冲刺</button>
+        <button class="btn" id="btnJump" title="空格键也可以跳跃">腾空跳跃</button>
+        <button class="btn" id="btnBell" title="按响车铃">按车铃</button>
+        <button class="btn" id="btnFish" title="嘴里叼条小鱼">投喂小鱼</button>
+        <button class="btn" id="btnTheme" title="切换昼夜与黄昏">切换天气</button>
+        <a class="btn" id="btnDownload" download="pelican-bicycle.html" href="#">下载 HTML</a>
+      </div>
+    </div>
+
+    <svg class="stage" viewBox="0 0 960 600" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <!-- Pelican Feather Gradients -->
+        <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#ffffff" />
+          <stop offset="70%" stop-color="#f1f5f9" />
+          <stop offset="100%" stop-color="#cbd5e1" />
+        </linearGradient>
+
+        <linearGradient id="wingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#f8fafc" />
+          <stop offset="65%" stop-color="#e2e8f0" />
+          <stop offset="100%" stop-color="#64748b" />
+        </linearGradient>
+
+        <!-- Pelican Beak & Pouch Gradients -->
+        <linearGradient id="beakTopGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#fde047" />
+          <stop offset="60%" stop-color="#f59e0b" />
+          <stop offset="100%" stop-color="#ef4444" />
+        </linearGradient>
+
+        <linearGradient id="pouchGrad" x1="0%" y1="0%" x2="40%" y2="100%">
+          <stop offset="0%" stop-color="#fbbf24" />
+          <stop offset="55%" stop-color="#f97316" />
+          <stop offset="100%" stop-color="#ea580c" />
+        </linearGradient>
+
+        <!-- Bike Frame Gradient -->
+        <linearGradient id="frameGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#ef4444" />
+          <stop offset="50%" stop-color="#dc2626" />
+          <stop offset="100%" stop-color="#991b1b" />
+        </linearGradient>
+
+        <!-- Tire & Rim -->
+        <radialGradient id="hubGrad">
+          <stop offset="0%" stop-color="#f8fafc" />
+          <stop offset="100%" stop-color="#64748b" />
+        </radialGradient>
+
+        <!-- Shadow Filter -->
+        <filter id="softShadow" x="-15%" y="-15%" width="130%" height="130%">
+          <feDropShadow dx="0" dy="6" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.18" />
+        </filter>
+      </defs>
+
+      <!-- Night Stars -->
+      <g class="night-stars" fill="#fef08a">
+        <circle cx="120" cy="80" r="2" />
+        <circle cx="240" cy="120" r="1.5" />
+        <circle cx="390" cy="65" r="2.4" />
+        <circle cx="520" cy="95" r="1.6" />
+        <circle cx="690" cy="70" r="2.2" />
+        <circle cx="830" cy="110" r="1.8" />
+        <circle cx="170" cy="180" r="1.4" />
+        <circle cx="610" cy="150" r="2" />
+        <circle cx="880" cy="60" r="2.5" />
+      </g>
+
+      <!-- Sun / Moon -->
+      <g transform="translate(790, 115)">
+        <circle cx="0" cy="0" r="68" fill="var(--sun-glow)" />
+        <circle cx="0" cy="0" r="46" fill="var(--sun-color)" />
+      </g>
+
+      <!-- Animated Clouds -->
+      <g class="cloud-slow" opacity="0.88" fill="#ffffff">
+        <g transform="translate(0, 85)">
+          <ellipse cx="60" cy="30" rx="45" ry="22" />
+          <ellipse cx="95" cy="20" rx="35" ry="26" />
+          <ellipse cx="130" cy="32" rx="38" ry="20" />
+        </g>
+      </g>
+
+      <g class="cloud-med" opacity="0.75" fill="#ffffff">
+        <g transform="translate(-420, 145) scale(0.8)">
+          <ellipse cx="60" cy="30" rx="48" ry="22" />
+          <ellipse cx="105" cy="18" rx="38" ry="28" />
+          <ellipse cx="145" cy="30" rx="40" ry="20" />
+        </g>
+      </g>
+
+      <g class="cloud-fast" opacity="0.6" fill="#ffffff">
+        <g transform="translate(-150, 55) scale(0.62)">
+          <ellipse cx="60" cy="30" rx="45" ry="20" />
+          <ellipse cx="95" cy="22" rx="32" ry="24" />
+          <ellipse cx="128" cy="30" rx="35" ry="18" />
+        </g>
+      </g>
+
+      <!-- Distant Seagulls -->
+      <g stroke="#475569" stroke-width="2.2" fill="none" stroke-linecap="round" opacity="0.55">
+        <path d="M 190 155 Q 200 143 210 153 Q 220 143 230 155" />
+        <path d="M 245 135 Q 252 126 260 133 Q 268 126 275 135" />
+      </g>
+
+      <!-- Rolling Hills -->
+      <path d="M -20 470 Q 180 350 420 445 T 980 420 L 980 500 L -20 500 Z" fill="var(--hill-back)" opacity="0.85" />
+      <path d="M -20 480 Q 260 390 560 455 T 980 445 L 980 510 L -20 510 Z" fill="var(--hill-front)" />
+
+      <!-- Scrolling Roadside Trees & Milepost -->
+      <g class="scenery-scroll">
+        <!-- Pine / Coastal Tree 1 -->
+        <g transform="translate(80, 385)">
+          <rect x="18" y="55" width="10" height="35" rx="3" fill="#78350f" />
+          <circle cx="23" cy="40" r="28" fill="#059669" />
+          <circle cx="12" cy="48" r="20" fill="#10b981" />
+          <circle cx="34" cy="48" r="20" fill="#047857" />
+        </g>
+        <!-- Coastal Signpost -->
+        <g transform="translate(460, 415)">
+          <rect x="12" y="25" width="6" height="45" fill="#94a3b8" />
+          <polygon points="0,12 42,12 50,22 42,32 0,32" fill="#0284c7" stroke="#ffffff" stroke-width="2" />
+          <circle cx="15" cy="22" r="4" fill="#fde047" />
+        </g>
+        <!-- Bush -->
+        <g transform="translate(760, 442)">
+          <ellipse cx="20" cy="22" rx="22" ry="15" fill="#059669" />
+          <ellipse cx="42" cy="25" rx="18" ry="12" fill="#10b981" />
+        </g>
+      </g>
+
+      <!-- Road & Grass Strip -->
+      <rect x="0" y="468" width="960" height="12" fill="var(--grass-border)" />
+      <rect x="0" y="480" width="960" height="120" fill="var(--road-bg)" />
+      <line x1="0" y1="540" x2="960" y2="540"
+            stroke="var(--road-line)"
+            stroke-width="6"
+            stroke-dasharray="48 72"
+            stroke-linecap="round"
+            class="road-dashes"
+            opacity="0.85" />
+
+      <!-- Ground Shadow directly under bicycle -->
+      <ellipse id="groundShadow" cx="465" cy="518" rx="175" ry="12" fill="#0f172a" opacity="0.35" />
+
+      <!-- ==================== PELICAN + BICYCLE MASTER GROUP ==================== -->
+      <g id="bikeAndPelican" filter="url(#softShadow)">
+        <g class="pelican-rig">
+
+          <!-- ========== BACK LEG (behind bicycle frame) ========== -->
+          <g id="backLegGroup">
+            <!-- Thigh + Lower Leg + Webbed Foot -->
+            <polyline id="backLegBones"
+                      points="388,288 430,340 458,420"
+                      fill="none"
+                      stroke="#ea580c"
+                      stroke-width="11"
+                      stroke-linecap="round"
+                      stroke-linejoin="round" />
+            <polygon id="backFoot"
+                     points="448,420 484,414 478,428 446,427"
+                     fill="#ea580c" />
+            <!-- Back Pedal Crank -->
+            <line id="backCrank"
+                  x1="458" y1="420" x2="458" y2="420"
+                  stroke="#64748b" stroke-width="6" stroke-linecap="round" />
+          </g>
+
+          <!-- ========== BICYCLE WHEELS ========== -->
+          <!-- Rear Wheel (center: 325, 430, radius: 74) -->
+          <g transform="translate(325, 430)">
+            <g class="wheel-spin">
+              <!-- Tire -->
+              <circle cx="0" cy="0" r="74" fill="none" stroke="#1e293b" stroke-width="14" />
+              <!-- Whitewall inner rim -->
+              <circle cx="0" cy="0" r="64" fill="none" stroke="#e2e8f0" stroke-width="4" />
+              <!-- Spokes -->
+              <g stroke="#cbd5e1" stroke-width="2">
+                <line x1="-62" y1="0" x2="62" y2="0" />
+                <line x1="0" y1="-62" x2="0" y2="62" />
+                <line x1="-44" y1="-44" x2="44" y2="44" />
+                <line x1="-44" y1="44" x2="44" y2="-44" />
+                <line x1="-57" y1="-24" x2="57" y2="24" />
+                <line x1="-24" y1="57" x2="24" y2="-57" />
+                <line x1="-57" y1="24" x2="57" y2="-24" />
+                <line x1="-24" y1="-57" x2="24" y2="57" />
+              </g>
+              <!-- Valve stem / reflector -->
+              <circle cx="38" cy="22" r="5" fill="#fbbf24" />
+            </g>
+            <!-- Rear Hub -->
+            <circle cx="0" cy="0" r="11" fill="url(#hubGrad)" stroke="#334155" stroke-width="3" />
+          </g>
+
+          <!-- Front Wheel (center: 605, 430, radius: 74) -->
+          <g transform="translate(605, 430)">
+            <g class="wheel-spin">
+              <!-- Tire -->
+              <circle cx="0" cy="0" r="74" fill="none" stroke="#1e293b" stroke-width="14" />
+              <!-- Whitewall inner rim -->
+              <circle cx="0" cy="0" r="64" fill="none" stroke="#e2e8f0" stroke-width="4" />
+              <!-- Spokes -->
+              <g stroke="#cbd5e1" stroke-width="2">
+                <line x1="-62" y1="0" x2="62" y2="0" />
+                <line x1="0" y1="-62" x2="0" y2="62" />
+                <line x1="-44" y1="-44" x2="44" y2="44" />
+                <line x1="-44" y1="44" x2="44" y2="-44" />
+                <line x1="-57" y1="-24" x2="57" y2="24" />
+                <line x1="-24" y1="57" x2="24" y2="-57" />
+                <line x1="-57" y1="24" x2="57" y2="-24" />
+                <line x1="-24" y1="-57" x2="24" y2="57" />
+              </g>
+              <!-- Reflector -->
+              <circle cx="-38" cy="-22" r="5" fill="#fbbf24" />
+            </g>
+            <!-- Front Hub -->
+            <circle cx="0" cy="0" r="11" fill="url(#hubGrad)" stroke="#334155" stroke-width="3" />
+          </g>
+
+          <!-- ========== BICYCLE FRAME & COMPONENTS ========== -->
+          <!-- Rear Fender -->
+          <path d="M 244 415 A 82 82 0 0 1 392 375" fill="none" stroke="#ef4444" stroke-width="7" stroke-linecap="round" />
+          <!-- Front Fender -->
+          <path d="M 538 380 A 82 82 0 0 1 676 392" fill="none" stroke="#ef4444" stroke-width="7" stroke-linecap="round" />
+
+          <!-- Chain & Sprocket -->
+          <path d="M 325 421 L 458 402 L 458 438 L 325 439 Z"
+                fill="none" stroke="#475569" stroke-width="3.5" stroke-dasharray="6 4" />
+
+          <!-- Seat Post & Handlebar Stem (Silver) -->
+          <line x1="395" y1="322" x2="380" y2="282" stroke="#cbd5e1" stroke-width="9" stroke-linecap="round" />
+          <line x1="556" y1="316" x2="538" y2="262" stroke="#cbd5e1" stroke-width="9" stroke-linecap="round" />
+
+          <!-- Curved Cruiser Handlebars -->
+          <path d="M 538 262 Q 528 245 498 258" fill="none" stroke="#cbd5e1" stroke-width="8" stroke-linecap="round" />
+
+          <!-- Diamond Frame Tubes -->
+          <g stroke="url(#frameGrad)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" fill="none">
+            <!-- Chain stay -->
+            <line x1="325" y1="430" x2="458" y2="420" />
+            <!-- Seat stay -->
+            <line x1="325" y1="430" x2="395" y2="322" />
+            <!-- Seat tube -->
+            <line x1="458" y1="420" x2="395" y2="322" />
+            <!-- Down tube -->
+            <line x1="458" y1="420" x2="562" y2="332" />
+            <!-- Top tube (curved cruiser style) -->
+            <path d="M 395 322 Q 478 312 556 318" />
+            <!-- Front fork -->
+            <path d="M 556 316 L 564 336 L 605 430" />
+          </g>
+
+          <!-- Front Wicker Basket with Little Fish -->
+          <g transform="translate(558, 265)">
+            <!-- Basket Straps -->
+            <line x1="0" y1="12" x2="-12" y2="12" stroke="#78350f" stroke-width="4" />
+            <line x1="0" y1="34" x2="-6" y2="34" stroke="#78350f" stroke-width="4" />
+            <!-- Basket Body -->
+            <path d="M 0 4 L 46 4 L 38 46 L 6 46 Z" fill="#d97706" stroke="#92400e" stroke-width="2.5" stroke-linejoin="round" />
+            <!-- Wicker Texture -->
+            <line x1="4" y1="16" x2="43" y2="16" stroke="#92400e" stroke-width="2" />
+            <line x1="5" y1="28" x2="41" y2="28" stroke="#92400e" stroke-width="2" />
+            <line x1="15" y1="4" x2="17" y2="46" stroke="#92400e" stroke-width="2" />
+            <line x1="30" y1="4" x2="28" y2="46" stroke="#92400e" stroke-width="2" />
+            <!-- Fish tail sticking out of basket -->
+            <path d="M 22 4 Q 28 -12 38 -6 Q 32 0 32 4" fill="#38bdf8" stroke="#0284c7" stroke-width="1.5" />
+            <polygon points="36,-6 45,-14 43,-1" fill="#38bdf8" stroke="#0284c7" stroke-width="1.5" />
+          </g>
+
+          <!-- Leather Saddle -->
+          <path d="M 352 280 Q 378 272 412 285 Q 395 298 358 292 Z" fill="#78350f" stroke="#451a03" stroke-width="2.5" />
+
+          <!-- Crankset Gear Ring -->
+          <circle cx="458" cy="420" r="22" fill="#e2e8f0" stroke="#475569" stroke-width="4" />
+          <circle cx="458" cy="420" r="14" fill="none" stroke="#64748b" stroke-width="2" stroke-dasharray="5 5" />
+          <circle cx="458" cy="420" r="6" fill="#334155" />
+
+          <!-- ========== PELICAN BODY ========== -->
+          <!-- Tail Feathers -->
+          <path d="M 338 258 L 304 244 L 315 262 L 298 268 L 322 275 L 312 284 L 344 278 Z"
+                fill="#e2e8f0" stroke="#94a3b8" stroke-width="2" stroke-linejoin="round" />
+
+          <!-- Plump Pelican Torso -->
+          <path d="M 336 266 C 330 220, 385 198, 434 218 C 466 232, 464 278, 432 292 C 394 306, 344 294, 336 266 Z"
+                fill="url(#bodyGrad)" stroke="#94a3b8" stroke-width="2.5" />
+
+          <!-- Red Aviator Scarf (fluttering behind neck) -->
+          <g class="scarf-wave">
+            <path d="M 432 225 C 395 215, 362 200, 332 214 C 352 228, 385 232, 428 240 Z"
+                  fill="#ef4444" stroke="#b91c1c" stroke-width="2" />
+            <path d="M 425 232 C 398 232, 372 230, 348 242 C 370 250, 398 246, 428 242 Z"
+                  fill="#dc2626" stroke="#991b1b" stroke-width="2" />
+          </g>
+
+          <!-- Graceful S-Curved Pelican Neck -->
+          <path d="M 422 236 C 414 196, 444 166, 442 132 C 441 118, 465 118, 466 135 C 468 172, 446 202, 452 242 Z"
+                fill="url(#bodyGrad)" stroke="#94a3b8" stroke-width="2.2" />
+
+          <!-- Scarf Collar Wrap -->
+          <path d="M 418 225 Q 438 234 456 226 Q 458 240 436 244 Q 416 240 418 225 Z"
+                fill="#ef4444" stroke="#991b1b" stroke-width="2" />
+
+          <!-- ========== PELICAN HEAD, HELMET & GIANT POUCH BEAK ========== -->
+          <g id="pelicanHead">
+            <!-- Fluffy Head Crest Feathers -->
+            <path d="M 432 110 L 414 98 L 426 116 L 410 112 L 426 124 Z" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.8" />
+
+            <!-- Head Skull -->
+            <ellipse cx="452" cy="118" rx="26" ry="22" fill="url(#bodyGrad)" stroke="#94a3b8" stroke-width="2.2" />
+
+            <!-- Optional Bonus Fish in Beak Pouch (toggled by button) -->
+            <g id="bonusFish" class="pouch-fish">
+              <path d="M 520 155 C 538 135, 566 135, 578 152 C 562 168, 538 168, 520 155 Z"
+                    fill="#38bdf8" stroke="#0284c7" stroke-width="2" />
+              <polygon points="576,152 592,140 589,162" fill="#38bdf8" stroke="#0284c7" stroke-width="2" />
+              <circle cx="534" cy="149" r="2.5" fill="#0f172a" />
+            </g>
+
+            <!-- Iconic Gular Pouch (Lower Beak) -->
+            <path d="M 468 122 C 472 184, 536 196, 588 154 C 602 142, 608 130, 610 124 Z"
+                  fill="url(#pouchGrad)" stroke="#c2410c" stroke-width="2.5" stroke-linejoin="round" />
+            <!-- Pouch Stretch Fold Lines -->
+            <path d="M 484 134 Q 528 168 584 136" fill="none" stroke="#ea580c" stroke-width="2" opacity="0.65" />
+            <path d="M 498 148 Q 535 174 572 148" fill="none" stroke="#9a3412" stroke-width="1.6" opacity="0.45" />
+
+            <!-- Long Upper Mandible (Upper Beak) with Hooked Tip -->
+            <path d="M 466 106 L 606 114 C 615 115, 618 123, 612 130 C 608 134, 603 130, 604 125 L 466 124 Z"
+                  fill="url(#beakTopGrad)" stroke="#b45309" stroke-width="2.2" stroke-linejoin="round" />
+
+            <!-- Expressive Eye + Cheek -->
+            <circle cx="458" cy="112" r="7.5" fill="#ffffff" stroke="#475569" stroke-width="1.8" />
+            <circle cx="460" cy="112" r="4" fill="#0f172a" />
+            <circle cx="461.5" cy="110" r="1.5" fill="#ffffff" />
+            <ellipse cx="452" cy="123" rx="6" ry="3.2" fill="#fb7185" opacity="0.55" />
+
+            <!-- Cute Blue Cycling Helmet -->
+            <path d="M 424 106 C 424 80, 478 78, 482 106 Z"
+                  fill="#0284c7" stroke="#0369a1" stroke-width="2.5" />
+            <!-- Helmet Visor & Vents -->
+            <path d="M 422 106 L 488 106" stroke="#0f172a" stroke-width="4" stroke-linecap="round" />
+            <ellipse cx="445" cy="93" rx="6" ry="2.8" transform="rotate(-12 445 93)" fill="#e0f2fe" />
+            <ellipse cx="463" cy="93" rx="6" ry="2.8" transform="rotate(8 463 93)" fill="#e0f2fe" />
+            <!-- Helmet Chin Strap -->
+            <path d="M 434 106 Q 442 132 458 132" fill="none" stroke="#334155" stroke-width="2.2" />
+          </g>
+
+          <!-- ========== FRONT LEG (Pedaling on near side) ========== -->
+          <g id="frontLegGroup">
+            <!-- Front Pedal Crank -->
+            <line id="frontCrank"
+                  x1="458" y1="420" x2="458" y2="420"
+                  stroke="#94a3b8" stroke-width="7" stroke-linecap="round" />
+
+            <!-- Thigh + Lower Leg -->
+            <polyline id="frontLegBones"
+                      points="396,290 442,345 458,420"
+                      fill="none"
+                      stroke="#f97316"
+                      stroke-width="12"
+                      stroke-linecap="round"
+                      stroke-linejoin="round" />
+
+            <!-- Webbed Pelican Foot on Pedal -->
+            <polygon id="frontFoot"
+                     points="448,420 486,414 480,429 446,428"
+                     fill="#fb923c"
+                     stroke="#c2410c"
+                     stroke-width="2"
+                     stroke-linejoin="round" />
+
+            <!-- Pedal Platform -->
+            <rect id="frontPedal"
+                  x="444" y="422" width="28" height="7" rx="3"
+                  fill="#1e293b" stroke="#cbd5e1" stroke-width="1.5" />
+          </g>
+
+          <!-- ========== PELICAN WING REACHING TO HANDLEBAR ========== -->
+          <g class="wing-flap">
+            <!-- Main Wing Shoulder & Feathers -->
+            <path d="M 382 238 C 415 228, 458 242, 502 256 C 488 274, 444 282, 396 274 C 374 268, 368 246, 382 238 Z"
+                  fill="url(#wingGrad)" stroke="#64748b" stroke-width="2.4" stroke-linejoin="round" />
+            <!-- Wing Feather Layering Details -->
+            <path d="M 398 252 Q 436 258 474 256" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-linecap="round" />
+            <path d="M 392 263 Q 428 269 462 266" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-linecap="round" />
+            <!-- Wing Tip Gripping Handlebar -->
+            <ellipse cx="500" cy="257" rx="11" ry="8" fill="#f8fafc" stroke="#64748b" stroke-width="2.2" />
+          </g>
+
+          <!-- Handlebar Grip & Brass Bike Bell (foreground) -->
+          <rect x="486" y="252" width="24" height="10" rx="5" transform="rotate(-10 498 257)" fill="#1e293b" />
+          <circle cx="524" cy="246" r="7" fill="#fbbf24" stroke="#b45309" stroke-width="2" />
+
+          <!-- Bell Ring Visual Effect -->
+          <g id="bellEffect" class="bell-ring">
+            <path d="M 518 228 Q 526 216 538 224" fill="none" stroke="#f59e0b" stroke-width="3" stroke-linecap="round" />
+            <path d="M 512 220 Q 526 202 546 216" fill="none" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round" />
+            <text x="515" y="198" font-size="16" font-weight="bold" fill="#d97706">叮铃铃~</text>
+          </g>
+
+        </g>
+      </g>
+    </svg>
+
+    <div class="footer-hint">
+      提示：点击上方按钮或按 <strong>空格键 (Space)</strong> 让鹈鹕跳跃，点击画面任意处按响车铃
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      // Inverse kinematics solver for 2-bone leg (hip -> knee -> pedal)
+      function solveKnee(hipX, hipY, footX, footY, L1, L2) {
+        const dx = footX - hipX;
+        const dy = footY - hipY;
+        let dist = Math.hypot(dx, dy);
+        const maxReach = L1 + L2 - 0.5;
+        if (dist > maxReach) dist = maxReach;
+        if (dist < Math.abs(L1 - L2) + 0.5) dist = Math.abs(L1 - L2) + 0.5;
+
+        const baseAngle = Math.atan2(dy, dx);
+        const cosAngle = (L1 * L1 + dist * dist - L2 * L2) / (2 * L1 * dist);
+        const clampedCos = Math.max(-1, Math.min(1, cosAngle));
+        // Bend knee forward (towards bicycle front / right)
+        const kneeAngle = baseAngle - Math.acos(clampedCos);
+
+        return {
+          x: hipX + L1 * Math.cos(kneeAngle),
+          y: hipY + L1 * Math.sin(kneeAngle)
+        };
+      }
+
+      const crankCenter = { x: 458, y: 420 };
+      const crankRadius = 28;
+      const frontHip = { x: 396, y: 290 };
+      const backHip = { x: 388, y: 288 };
+      const thighLen = 78;
+      const shinLen = 82;
+
+      const frontLegBones = document.getElementById('frontLegBones');
+      const frontFoot = document.getElementById('frontFoot');
+      const frontCrank = document.getElementById('frontCrank');
+      const frontPedal = document.getElementById('frontPedal');
+
+      const backLegBones = document.getElementById('backLegBones');
+      const backFoot = document.getElementById('backFoot');
+      const backCrank = document.getElementById('backCrank');
+
+      let crankAngle = 0;
+      let speedLevel = 1; // 0: leisure, 1: normal, 2: turbo
+      const speedConfigs = [
+        { label: '悠闲模式', kmh: '14 km/h', angularVel: 0.055, bob: '0.7s', wheel: '1.4s', road: '1.1s' },
+        { label: '加速冲刺', kmh: '24 km/h', angularVel: 0.095, bob: '0.48s', wheel: '0.96s', road: '0.7s' },
+        { label: '极速狂飙', kmh: '42 km/h', angularVel: 0.165, bob: '0.28s', wheel: '0.52s', road: '0.38s' }
+      ];
+
+      function updatePedaling() {
+        const cfg = speedConfigs[speedLevel];
+        crankAngle = (crankAngle + cfg.angularVel) % (Math.PI * 2);
+
+        // Front pedal position
+        const fx = crankCenter.x + crankRadius * Math.cos(crankAngle);
+        const fy = crankCenter.y + crankRadius * Math.sin(crankAngle);
+        const fKnee = solveKnee(frontHip.x, frontHip.y, fx, fy, thighLen, shinLen);
+
+        frontCrank.setAttribute('x2', fx.toFixed(1));
+        frontCrank.setAttribute('y2', fy.toFixed(1));
+        frontLegBones.setAttribute(
+          'points',
+          `${frontHip.x},${frontHip.y} ${fKnee.x.toFixed(1)},${fKnee.y.toFixed(1)} ${fx.toFixed(1)},${fy.toFixed(1)}`
+        );
+        frontFoot.setAttribute(
+          'points',
+          `${(fx - 10).toFixed(1)},${(fy - 2).toFixed(1)} ${(fx + 28).toFixed(1)},${(fy - 6).toFixed(1)} ${(fx + 22).toFixed(1)},${(fy + 7).toFixed(1)} ${(fx - 12).toFixed(1)},${(fy + 6).toFixed(1)}`
+        );
+        frontPedal.setAttribute('x', (fx - 14).toFixed(1));
+        frontPedal.setAttribute('y', (fy + 3).toFixed(1));
+
+        // Back pedal position (180 deg out of phase)
+        const backAngle = crankAngle + Math.PI;
+        const bx = crankCenter.x + crankRadius * Math.cos(backAngle);
+        const by = crankCenter.y + crankRadius * Math.sin(backAngle);
+        const bKnee = solveKnee(backHip.x, backHip.y, bx, by, thighLen, shinLen);
+
+        backCrank.setAttribute('x2', bx.toFixed(1));
+        backCrank.setAttribute('y2', by.toFixed(1));
+        backLegBones.setAttribute(
+          'points',
+          `${backHip.x},${backHip.y} ${bKnee.x.toFixed(1)},${bKnee.y.toFixed(1)} ${bx.toFixed(1)},${by.toFixed(1)}`
+        );
+        backFoot.setAttribute(
+          'points',
+          `${(bx - 10).toFixed(1)},${(by - 2).toFixed(1)} ${(bx + 26).toFixed(1)},${(by - 6).toFixed(1)} ${(bx + 20).toFixed(1)},${(by + 7).toFixed(1)} ${(bx - 12).toFixed(1)},${(by + 6).toFixed(1)}`
+        );
+
+        requestAnimationFrame(updatePedaling);
+      }
+
+      requestAnimationFrame(updatePedaling);
+
+      // Speed Toggle
+      const btnSpeed = document.getElementById('btnSpeed');
+      const speedReadout = document.getElementById('speedReadout');
+      btnSpeed.addEventListener('click', (e) => {
+        e.stopPropagation();
+        speedLevel = (speedLevel + 1) % speedConfigs.length;
+        const cfg = speedConfigs[speedLevel];
+        const nextCfg = speedConfigs[(speedLevel + 1) % speedConfigs.length];
+        btnSpeed.textContent = nextCfg.label;
+        speedReadout.textContent = cfg.kmh;
+        document.documentElement.style.setProperty('--pelican-bob', cfg.bob);
+        document.documentElement.style.setProperty('--wheel-spin', cfg.wheel);
+        document.documentElement.style.setProperty('--road-scroll', cfg.road);
+      });
+
+      // Jump Action
+      const bikeAndPelican = document.getElementById('bikeAndPelican');
+      const groundShadow = document.getElementById('groundShadow');
+      const btnJump = document.getElementById('btnJump');
+      let isJumping = false;
+
+      function triggerJump() {
+        if (isJumping) return;
+        isJumping = true;
+        bikeAndPelican.classList.add('jumping');
+        groundShadow.animate(
+          [
+            { transform: 'scale(1)', opacity: 0.35 },
+            { transform: 'scale(0.55)', opacity: 0.14 },
+            { transform: 'scale(1)', opacity: 0.35 }
+          ],
+          { duration: 750, easing: 'ease-in-out' }
+        );
+        setTimeout(() => {
+          bikeAndPelican.classList.remove('jumping');
+          isJumping = false;
+        }, 760);
+      }
+
+      btnJump.addEventListener('click', (e) => {
+        e.stopPropagation();
+        triggerJump();
+      });
+
+      window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') {
+          e.preventDefault();
+          triggerJump();
+        }
+      });
+
+      // Bike Bell Sound (Web Audio API synth + visual effect)
+      const btnBell = document.getElementById('btnBell');
+      const bellEffect = document.getElementById('bellEffect');
+      let bellTimeout = null;
+
+      function ringBell() {
+        bellEffect.classList.add('show');
+        clearTimeout(bellTimeout);
+        bellTimeout = setTimeout(() => bellEffect.classList.remove('show'), 900);
+
+        try {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (!AudioCtx) return;
+          const ctx = new AudioCtx();
+          [1567.98, 2093.0].forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.09);
+            gain.gain.setValueAtTime(0.18, ctx.currentTime + idx * 0.09);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.09 + 0.45);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(ctx.currentTime + idx * 0.09);
+            osc.stop(ctx.currentTime + idx * 0.09 + 0.46);
+          });
+        } catch (_) {}
+      }
+
+      btnBell.addEventListener('click', (e) => {
+        e.stopPropagation();
+        ringBell();
+      });
+
+      document.getElementById('scene').addEventListener('click', () => {
+        ringBell();
+      });
+
+      // Toggle Bonus Fish in Beak Pouch
+      const btnFish = document.getElementById('btnFish');
+      const bonusFish = document.getElementById('bonusFish');
+      let hasFish = true;
+      btnFish.addEventListener('click', (e) => {
+        e.stopPropagation();
+        hasFish = !hasFish;
+        bonusFish.style.display = hasFish ? 'block' : 'none';
+        btnFish.textContent = hasFish ? '收起小鱼' : '投喂小鱼';
+      });
+
+      // Theme Toggle (Day -> Sunset -> Night)
+      const btnTheme = document.getElementById('btnTheme');
+      const themes = ['', 'sunset', 'night'];
+      let themeIdx = 0;
+      btnTheme.addEventListener('click', (e) => {
+        e.stopPropagation();
+        themeIdx = (themeIdx + 1) % themes.length;
+        document.body.className = themes[themeIdx];
+      });
+
+      // Self-contained HTML file download button
+      const btnDownload = document.getElementById('btnDownload');
+      btnDownload.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const htmlSource = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+        const blob = new Blob([htmlSource], { type: 'text/html;charset=utf-8' });
+        btnDownload.href = URL.createObjectURL(blob);
+      });
+    })();
+  </script>
+</body>
+</html>
